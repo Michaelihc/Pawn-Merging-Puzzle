@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pawn Merging Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .game-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            gap: 2px;
+            border: 3px solid #8B4513;
+            background-color: #8B4513;
+            margin: 20px 0;
+        }
+
+        .square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            font-size: 36px;
+            user-select: none;
+        }
+
+        .square.light {
+            background-color: #F0D9B5;
+        }
+
+        .square.dark {
+            background-color: #B58863;
+        }
+
+        .square.selected {
+            background-color: #7FC8F8 !important;
+            box-shadow: inset 0 0 0 3px #2196F3;
+        }
+
+        .square.valid-target {
+            background-color: #90EE90 !important;
+            box-shadow: inset 0 0 0 3px #32CD32;
+        }
+
+        .square.highlight {
+            background-color: #FFD700 !important;
+        }
+
+        .pawn {
+            color: #333;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .instructions {
+            max-width: 600px;
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #e8f4f8;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .reset-btn {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .reset-btn:hover {
+            background-color: #d32f2f;
+        }
+
+        .clear-btn {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .clear-btn:hover {
+            background-color: #f57c00;
+        }
+
+        .status {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px 0;
+            min-height: 24px;
+        }
+
+        .game-mode {
+            margin: 10px 0;
+        }
+
+        .mode-toggle {
+            background-color: #2196F3;
+            color: white;
+            margin: 0 10px;
+        }
+
+        .mode-toggle:hover {
+            background-color: #1976D2;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Pawn Merging Puzzle</h1>
+        
+        <div class="instructions">
+            <p><strong>How to play:</strong> Click two adjacent pawns in the same row to merge them. 
+            This removes both pawns and lets you place a new pawn anywhere in the row above. 
+            Try to get pawns to the top rows!</p>
+        </div>
+
+        <div class="game-mode">
+            <span>Game Mode:</span>
+            <button class="mode-toggle" onclick="toggleMode()">
+                <span id="mode-text">Merge Mode</span>
+            </button>
+        </div>
+
+        <div class="stats">
+            <div>Total Pawns: <span id="pawn-count">32</span></div>
+            <div>Moves Made: <span id="move-count">0</span></div>
+        </div>
+
+        <div class="status" id="status">Select two adjacent pawns in the same row to merge them</div>
+
+        <div class="grid" id="grid"></div>
+
+        <div class="controls">
+            <button class="reset-btn" onclick="resetGame()">Reset Game</button>
+            <button class="clear-btn" onclick="clearSelection()">Clear Selection</button>
+        </div>
+    </div>
+
+    <script>
+        class PawnGame {
+            constructor() {
+                this.grid = Array(8).fill().map(() => Array(8).fill(false));
+                this.selectedSquares = [];
+                this.mode = 'merge'; // 'merge' or 'place'
+                this.moveCount = 0;
+                this.waitingForPlacement = false;
+                this.targetRow = -1;
+                
+                this.initializeGame();
+                this.createGrid();
+                this.updateDisplay();
+            }
+
+            initializeGame() {
+                // Place pawns in bottom 4 rows (rows 4-7, 0-indexed)
+                for (let row = 4; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        this.grid[row][col] = true;
+                    }
+                }
+                this.moveCount = 0;
+                this.selectedSquares = [];
+                this.mode = 'merge';
+                this.waitingForPlacement = false;
+                this.targetRow = -1;
+            }
+
+            createGrid() {
+                const gridElement = document.getElementById('grid');
+                gridElement.innerHTML = '';
+
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        const square = document.createElement('div');
+                        square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                        square.dataset.row = row;
+                        square.dataset.col = col;
+                        square.addEventListener('click', () => this.handleSquareClick(row, col));
+                        gridElement.appendChild(square);
+                    }
+                }
+            }
+
+            handleSquareClick(row, col) {
+                if (this.mode === 'place') {
+                    this.handlePlacement(row, col);
+                } else {
+                    this.handleSelection(row, col);
+                }
+            }
+
+            handleSelection(row, col) {
+                const squareKey = `${row}-${col}`;
+                
+                // Only allow selection of squares with pawns
+                if (!this.grid[row][col]) {
+                    this.updateStatus("You can only select squares with pawns!");
+                    return;
+                }
+
+                // Check if square is already selected
+                const existingIndex = this.selectedSquares.findIndex(
+                    sq => sq.row === row && sq.col === col
+                );
+
+                if (existingIndex !== -1) {
+                    // Deselect the square
+                    this.selectedSquares.splice(existingIndex, 1);
+                } else {
+                    // Select the square
+                    if (this.selectedSquares.length < 2) {
+                        this.selectedSquares.push({ row, col });
+                    } else {
+                        // Replace oldest selection
+                        this.selectedSquares.shift();
+                        this.selectedSquares.push({ row, col });
+                    }
+                }
+
+                this.updateDisplay();
+                this.checkForValidMerge();
+            }
+
+            handlePlacement(row, col) {
+                if (row !== this.targetRow) {
+                    this.updateStatus(`You must place the pawn in row ${this.targetRow + 1} (counting from top)!`);
+                    return;
+                }
+
+                if (this.grid[row][col]) {
+                    this.updateStatus("That square already has a pawn! Choose an empty square.");
+                    return;
+                }
+
+                // Place the pawn
+                this.grid[row][col] = true;
+                this.mode = 'merge';
+                this.waitingForPlacement = false;
+                this.targetRow = -1;
+                this.moveCount++;
+                
+                this.updateDisplay();
+                this.updateStatus("Pawn placed! Select two adjacent pawns to merge next.");
+            }
+
+            checkForValidMerge() {
+                if (this.selectedSquares.length === 2) {
+                    const [sq1, sq2] = this.selectedSquares;
+                    
+                    // Check if they're in the same row
+                    if (sq1.row !== sq2.row) {
+                        this.updateStatus("Pawns must be in the same row to merge!");
+                        return;
+                    }
+
+                    // Check if they're adjacent
+                    if (Math.abs(sq1.col - sq2.col) !== 1) {
+                        this.updateStatus("Pawns must be adjacent to merge!");
+                        return;
+                    }
+
+                    // Check if there's a row above to place the new pawn
+                    if (sq1.row === 0) {
+                        this.updateStatus("Cannot merge pawns in the top row!");
+                        return;
+                    }
+
+                    // Valid merge!
+                    this.performMerge();
+                } else if (this.selectedSquares.length === 1) {
+                    this.updateStatus("Select a second adjacent pawn in the same row.");
+                } else {
+                    this.updateStatus("Select two adjacent pawns in the same row to merge them.");
+                }
+            }
+
+            performMerge() {
+                const [sq1, sq2] = this.selectedSquares;
+                
+                // Remove the two pawns
+                this.grid[sq1.row][sq1.col] = false;
+                this.grid[sq2.row][sq2.col] = false;
+                
+                // Clear selection
+                this.selectedSquares = [];
+                
+                // Set up placement mode
+                this.mode = 'place';
+                this.waitingForPlacement = true;
+                this.targetRow = sq1.row - 1; // Row above
+                
+                this.updateDisplay();
+                this.updateStatus(`Two pawns merged! Click on any empty square in row ${this.targetRow + 1} to place your new pawn.`);
+            }
+
+            updateDisplay() {
+                // Update grid display
+                const squares = document.querySelectorAll('.square');
+                squares.forEach(square => {
+                    const row = parseInt(square.dataset.row);
+                    const col = parseInt(square.dataset.col);
+                    
+                    // Reset classes
+                    square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                    
+                    // Add pawn if present
+                    if (this.grid[row][col]) {
+                        square.innerHTML = '<span class="pawn">♟</span>';
+                    } else {
+                        square.innerHTML = '';
+                    }
+                    
+                    // Highlight selected squares
+                    if (this.selectedSquares.some(sq => sq.row === row && sq.col === col)) {
+                        square.classList.add('selected');
+                    }
+                    
+                    // Highlight valid placement targets
+                    if (this.mode === 'place' && row === this.targetRow && !this.grid[row][col]) {
+                        square.classList.add('valid-target');
+                    }
+                });
+
+                // Update stats
+                this.updateStats();
+                
+                // Update mode display
+                document.getElementById('mode-text').textContent = 
+                    this.mode === 'merge' ? 'Merge Mode' : 'Place Mode';
+            }
+
+            updateStats() {
+                const pawnCount = this.grid.flat().filter(Boolean).length;
+                document.getElementById('pawn-count').textContent = pawnCount;
+                document.getElementById('move-count').textContent = this.moveCount;
+            }
+
+            updateStatus(message) {
+                document.getElementById('status').textContent = message;
+            }
+
+            clearSelection() {
+                this.selectedSquares = [];
+                if (this.mode === 'place') {
+                    this.mode = 'merge';
+                    this.waitingForPlacement = false;
+                    this.targetRow = -1;
+                }
+                this.updateDisplay();
+                this.updateStatus("Selection cleared. Select two adjacent pawns in the same row to merge them.");
+            }
+
+            reset() {
+                this.initializeGame();
+                this.updateDisplay();
+                this.updateStatus("Game reset! Select two adjacent pawns in the same row to merge them.");
+            }
+        }
+
+        // Initialize game
+        let game = new PawnGame();
+
+        // Global functions for buttons
+        function resetGame() {
+            game.reset();
+        }
+
+        function clearSelection() {
+            game.clearSelection();
+        }
+
+        function toggleMode() {
+            // This is just for display - actual mode is controlled by game logic
+            if (game.mode === 'place') {
+                game.clearSelection();
+            }
+        }
+    </script>
+</body>
+</html>

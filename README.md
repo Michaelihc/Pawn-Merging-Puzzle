@@ -17,6 +17,9 @@ A simple browser-based puzzle game where you merge adjacent pawns on a chessboar
   - **Merge Mode**: Select pawns to merge.
   - **Place Mode**: Activated after a merge; click an empty square in the target row to place the new pawn.
 
+<img width="844" height="846" alt="image" src="https://github.com/user-attachments/assets/baca582e-a6d1-4c11-9302-e180c3f77c8f" />
+
+
 ## Setup and Running
 
 ### Local Setup
@@ -27,5 +30,3 @@ A simple browser-based puzzle game where you merge adjacent pawns on a chessboar
 1. Copy the entire content of `index.html`.
 2. Paste it into [Liveweave](https://liveweave.com/) (use the HTML pane).
 3. The game will render live in the preview window.
-
-<img width="1040" height="1435" alt="image" src="https://github.com/user-attachments/assets/ca1b909b-f5ee-4cfe-9112-c9d6a311268d" /># Pawn Merging Puzzle
